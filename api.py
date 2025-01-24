@@ -17,3 +17,6 @@ data = [
 @app.get("/sales")
 def get_sales():
     return data
+
+
+ 

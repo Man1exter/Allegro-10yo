@@ -28,63 +28,90 @@ data = fetch_data()
 if data.empty:
     st.stop()
 
+# Filtrowanie danych po roku
+st.sidebar.subheader("Filtruj dane po roku")
+min_year = int(data["year"].min())
+max_year = int(data["year"].max())
+year_range = st.sidebar.slider(
+    "Wybierz zakres lat",
+    min_value=min_year,
+    max_value=max_year,
+    value=(min_year, max_year)
+)
+filtered_data = data[(data["year"] >= year_range[0]) & (data["year"] <= year_range[1])]
+
 # Wybór branży
-industries = data["industry"].unique()
-selected_industry = st.sidebar.selectbox("Wybierz branżę", industries)
+st.sidebar.subheader("Wybierz branżę do analizy")
+industries = filtered_data["industry"].unique()
+selected_industry = st.sidebar.selectbox("Branża", industries)
 
 # Filtrowanie danych dla wybranej branży
-industry_data = data[data["industry"] == selected_industry]
+industry_data = filtered_data[filtered_data["industry"] == selected_industry]
 
-# Wyświetlenie danych
-st.subheader(f"Dane sprzedaży dla branży: {selected_industry}")
-st.write(industry_data)
+# Statystyki opisowe
+st.subheader(f"Statystyki opisowe dla branży: {selected_industry}")
+stats = industry_data["sales_amount"].describe()
+st.write(stats)
 
 # Wykres sprzedaży w czasie
 st.subheader("Sprzedaż w czasie")
 plt.figure(figsize=(10, 6))
-plt.plot(industry_data["year"], industry_data["sales_amount"], marker="o")
-plt.title(f"Sprzedaż w branży {selected_industry} (2013-2022)")
+plt.plot(industry_data["year"], industry_data["sales_amount"], marker="o", label="Dane historyczne")
+plt.title(f"Sprzedaż w branży {selected_industry} ({year_range[0]}-{year_range[1]})")
 plt.xlabel("Rok")
 plt.ylabel("Sprzedaż (PLN)")
 plt.grid()
+plt.legend()
 st.pyplot(plt)
 
-# Model wzrostu (regresja liniowa)
-st.subheader("Prognoza wzrostu")
+# Analiza trendów (regresja liniowa)
+st.subheader("Analiza trendów")
 X = industry_data["year"].values.reshape(-1, 1)
 y = industry_data["sales_amount"].values
 
 model = LinearRegression()
 model.fit(X, y)
-future_years = np.array([2023, 2024, 2025]).reshape(-1, 1)
-predictions = model.predict(future_years)
+trend_line = model.predict(X)
 
-# Wyświetlenie prognozy
-st.write("Prognoza sprzedaży na lata 2023-2025:")
-future_data = pd.DataFrame({
-    "Rok": future_years.flatten(),
-    "Prognozowana sprzedaż": predictions
-})
-st.write(future_data)
-
-# Wykres prognozy
 plt.figure(figsize=(10, 6))
 plt.plot(industry_data["year"], industry_data["sales_amount"], marker="o", label="Dane historyczne")
-plt.plot(future_years, predictions, marker="o", linestyle="--", label="Prognoza")
-plt.title(f"Prognoza sprzedaży dla branży {selected_industry}")
+plt.plot(industry_data["year"], trend_line, linestyle="--", label="Trend liniowy")
+plt.title(f"Trend sprzedaży dla branży {selected_industry}")
 plt.xlabel("Rok")
 plt.ylabel("Sprzedaż (PLN)")
-plt.legend()
 plt.grid()
+plt.legend()
 st.pyplot(plt)
 
-# Porównanie branż
-st.subheader("Porównanie sprzedaży między branżami")
-plt.figure(figsize=(12, 8))
-sns.lineplot(data=data, x="year", y="sales_amount", hue="industry", marker="o")
-plt.title("Porównanie sprzedaży między branżami (2013-2022)")
-plt.xlabel("Rok")
-plt.ylabel("Sprzedaż (PLN)")
-plt.legend(title="Branża")
-plt.grid()
-st.pyplot(plt)
+# Porównanie dwóch branż
+st.sidebar.subheader("Porównanie dwóch branż")
+industry_1 = st.sidebar.selectbox("Wybierz pierwszą branżę", industries, key="industry_1")
+industry_2 = st.sidebar.selectbox("Wybierz drugą branżę", industries, key="industry_2")
+
+if industry_1 != industry_2:
+    st.subheader(f"Porównanie sprzedaży: {industry_1} vs {industry_2}")
+    industry_1_data = filtered_data[filtered_data["industry"] == industry_1]
+    industry_2_data = filtered_data[filtered_data["industry"] == industry_2]
+
+    plt.figure(figsize=(12, 8))
+    plt.plot(industry_1_data["year"], industry_1_data["sales_amount"], marker="o", label=industry_1)
+    plt.plot(industry_2_data["year"], industry_2_data["sales_amount"], marker="o", label=industry_2)
+    plt.title(f"Porównanie sprzedaży: {industry_1} vs {industry_2}")
+    plt.xlabel("Rok")
+    plt.ylabel("Sprzedaż (PLN)")
+    plt.grid()
+    plt.legend()
+    st.pyplot(plt)
+else:
+    st.warning("Wybierz dwie różne branże do porównania.")
+
+# Eksport danych
+st.subheader("Eksport danych")
+if st.button("Pobierz dane jako CSV"):
+    csv = filtered_data.to_csv(index=False).encode("utf-8")
+    st.download_button(
+        label="Kliknij, aby pobrać",
+        data=csv,
+        file_name="sales_data.csv",
+        mime="text/csv"
+    )

@@ -115,3 +115,7 @@ if st.button("Pobierz dane jako CSV"):
         file_name="sales_data.csv",
         mime="text/csv"
     )
+    
+    
+    
+## streamlit run app.py - uruchamianie
